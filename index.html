@@ -1,1 +1,485 @@
-<h1>Hello world!<h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Better Call Saul Challenge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #FF3D00;
+      --primary-dark: #D32F2F;
+      --accent: #FFC107;
+      --dark: #212121;
+      --darker: #121212;
+      --light: #FAFAFA;
+      --gray: #424242;
+      --light-gray: #BDBDBD;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background-color: var(--darker);
+      color: var(--light);
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .container {
+      max-width: 600px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      position: relative;
+    }
+    
+    .logo {
+      font-family: 'Oswald', sans-serif;
+      font-size: 2.5rem;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      position: relative;
+      display: inline-block;
+    }
+    
+    .logo::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 3px;
+    }
+    
+    .subtitle {
+      color: var(--light-gray);
+      font-size: 0.9rem;
+      font-weight: 400;
+    }
+    
+    .card {
+      background-color: var(--dark);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .timer {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 1.5rem;
+      background: linear-gradient(135deg, var(--dark), var(--gray));
+      border-radius: 8px;
+      margin: 1rem 0;
+      border: 1px solid var(--gray);
+    }
+    
+    .timer span {
+      color: var(--primary);
+    }
+    
+    .challenge-end {
+      font-size: 0.9rem;
+      color: var(--light-gray);
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+    
+    .referral-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .input-group {
+      display: flex;
+      width: 100%;
+    }
+    
+    .input-group input {
+      flex: 1;
+      padding: 0.8rem 1rem;
+      border: 1px solid var(--gray);
+      border-radius: 8px 0 0 8px;
+      background-color: var(--darker);
+      color: var(--light);
+      font-size: 0.9rem;
+    }
+    
+    .input-group button {
+      padding: 0 1.2rem;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .input-group button:hover {
+      background-color: var(--primary-dark);
+    }
+    
+    .leaderboard {
+      width: 100%;
+    }
+    
+    .leaderboard-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    
+    .leaderboard-list {
+      max-height: 300px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--primary) var(--dark);
+    }
+    
+    .leaderboard-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .leaderboard-list::-webkit-scrollbar-track {
+      background: var(--dark);
+    }
+    
+    .leaderboard-list::-webkit-scrollbar-thumb {
+      background-color: var(--primary);
+      border-radius: 6px;
+    }
+    
+    .leader-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.8rem 0;
+      border-bottom: 1px solid var(--gray);
+    }
+    
+    .leader-position {
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 30px;
+    }
+    
+    .leader-name {
+      flex: 1;
+      padding: 0 0.5rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .leader-score {
+      font-weight: 600;
+      color: var(--primary);
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    
+    .badge-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+    
+    .badge-accent {
+      background-color: var(--accent);
+      color: var(--dark);
+    }
+    
+    @media (max-width: 480px) {
+      .logo {
+        font-size: 2rem;
+      }
+      
+      .timer {
+        font-size: 1.5rem;
+        padding: 1rem;
+      }
+      
+      .card {
+        padding: 1rem;
+      }
+    }
+    
+    /* Animation */
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 class="logo">Better Call Saul</h1>
+      <p class="subtitle">Referral Challenge</p>
+    </header>
+    
+    <div class="card">
+      <h2 class="card-title">
+        <i class="fas fa-clock"></i> Time Remaining
+      </h2>
+      <div class="timer">
+        <span id="days">00</span>d 
+        <span id="hours">00</span>h 
+        <span id="minutes">00</span>m 
+        <span id="seconds">00</span>s
+      </div>
+      <p class="challenge-end">Challenge ends: <span id="endDate">June 30, 2024 at 23:59</span></p>
+    </div>
+    
+    <div class="card">
+      <h2 class="card-title">
+        <i class="fas fa-share-alt"></i> Your Referral Link
+      </h2>
+      <div class="referral-container">
+        <div class="input-group">
+          <input type="text" id="refLink" readonly>
+          <button id="copyBtn">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card leaderboard">
+      <h2 class="card-title">
+        <i class="fas fa-trophy"></i> Leaderboard
+      </h2>
+      <div class="leaderboard-header">
+        <span>User</span>
+        <span>Referrals</span>
+      </div>
+      <div class="leaderboard-list" id="leaders">
+        <!-- Leaderboard items will be inserted here -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = "https://Sonyaaaaaaaaaaaaaaaaaaaaa.pythonanywhere.com";
+    
+    // Challenge end date (YYYY, MM-1, DD, HH, MM, SS)
+    const CHALLENGE_END_DATE = new Date(2026, 5, 30, 23, 59, 59);
+    
+    // Используем localStorage для сохранения user_id
+    let tgUserId = localStorage.getItem('tg_user_id');
+    
+    // Если user_id нет в localStorage, генерируем новый и сохраняем
+    if (!tgUserId) {
+      tgUserId = `tg_${Math.floor(Math.random() * 100000)}`;
+      localStorage.setItem('tg_user_id', tgUserId);
+    }
+    
+    // Получаем referrer_id из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const referrerId = urlParams.get("start") || null;
+    
+    // DOM элементы
+    const daysEl = document.getElementById('days');
+    const hoursEl = document.getElementById('hours');
+    const minutesEl = document.getElementById('minutes');
+    const secondsEl = document.getElementById('seconds');
+    const endDateEl = document.getElementById('endDate');
+    const refLinkEl = document.getElementById('refLink');
+    const copyBtn = document.getElementById('copyBtn');
+    const leadersEl = document.getElementById('leaders');
+    
+    // Format end date for display
+    endDateEl.textContent = CHALLENGE_END_DATE.toLocaleString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    function updateCountdown() {
+      const now = new Date();
+      const diff = CHALLENGE_END_DATE - now;
+      
+      // If challenge has ended
+      if (diff <= 0) {
+        document.querySelector('.timer').innerHTML = '<span style="color: var(--accent)">Challenge Ended!</span>';
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      daysEl.textContent = formatTime(days);
+      hoursEl.textContent = formatTime(hours);
+      minutesEl.textContent = formatTime(minutes);
+      secondsEl.textContent = formatTime(seconds);
+      
+      // Add pulse animation when time is running low (last 3 days)
+      if (days <= 3) {
+        document.querySelector('.timer').classList.add('pulse');
+      } else {
+        document.querySelector('.timer').classList.remove('pulse');
+      }
+    }
+    
+    // Format time to always show 2 digits
+    const formatTime = (time) => time < 10 ? `0${time}` : time;
+    
+    async function register() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: tgUserId, referrer_id: referrerId })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Registration failed');
+        }
+      } catch (err) {
+        console.error("Registration error:", err);
+      }
+    }
+    
+    async function loadReferralLink() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/get-referral-link?user_id=${tgUserId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch referral link');
+        }
+        const data = await response.json();
+        refLinkEl.value = data.link;
+      } catch (err) {
+        console.error("Referral link error:", err);
+        refLinkEl.value = "Error loading link. Please refresh.";
+      }
+    }
+    
+    async function loadLeaderboard() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/leaderboard`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch leaderboard');
+        }
+        const list = await response.json();
+        
+        leadersEl.innerHTML = '';
+        
+        if (list.length === 0) {
+          leadersEl.innerHTML = '<div class="leader-item">No referrals yet. Be the first!</div>';
+          return;
+        }
+        
+        list.forEach((item, i) => {
+          const leaderItem = document.createElement('div');
+          leaderItem.className = 'leader-item';
+          
+          // Highlight current user
+          const isCurrentUser = item.user_id === tgUserId;
+          if (isCurrentUser) {
+            leaderItem.style.backgroundColor = 'rgba(255, 193, 7, 0.1)';
+            leaderItem.style.borderLeft = '3px solid var(--accent)';
+          }
+          
+          leaderItem.innerHTML = `
+            <span class="leader-position">${i + 1}</span>
+            <span class="leader-name">${item.user_id} ${isCurrentUser ? '<span class="badge badge-accent">You</span>' : ''}</span>
+            <span class="leader-score">${item.referrals} <span class="badge badge-primary">refs</span></span>
+          `;
+          
+          leadersEl.appendChild(leaderItem);
+        });
+      } catch (err) {
+        console.error("Leaderboard error:", err);
+        leadersEl.innerHTML = '<div class="leader-item">Error loading leaderboard</div>';
+      }
+    }
+    
+    function copyLink() {
+      refLinkEl.select();
+      refLinkEl.setSelectionRange(0, 99999);
+      document.execCommand('copy');
+      
+      // Change button temporarily to show success
+      copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+      copyBtn.style.backgroundColor = '#4CAF50';
+      
+      setTimeout(() => {
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.style.backgroundColor = '';
+      }, 2000);
+    }
+    
+    // Event listeners
+    copyBtn.addEventListener('click', copyLink);
+    
+    // Initialize
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+    
+    register();
+    loadReferralLink();
+    loadLeaderboard();
+    
+    // Load data every 30 seconds to keep leaderboard updated
+    setInterval(() => {
+      loadLeaderboard();
+    }, 30000);
+  </script>
+</body>
+</html>
