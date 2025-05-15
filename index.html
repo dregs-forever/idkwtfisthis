@@ -322,7 +322,7 @@
       </div>
       <div class="leaderboard-list" id="leaders">
         <div class="leader-item">
-          <span class="leader-position">1</span>
+          <span class="leader-position">1 <img src="pepe.png" class="prize-icon"></span>
           <span class="leader-name">Loading leaderboard...</span>
           <span class="leader-score">0 <span class="badge badge-primary">refs</span></span>
         </div>
@@ -332,7 +332,7 @@
 
   <script>
     const BACKEND_URL = "https://Sonyaaaaaaaaaaaaaaaaaaaaa.pythonanywhere.com";
-    const CHALLENGE_END_DATE = new Date(2024, 5, 30, 23, 59, 59);
+    const CHALLENGE_END_DATE = new Date(2026, 5, 30, 23, 59, 59);
     const BOT_TOKEN = "7910241015:AAHt-F_HbHdECJpZF1LRN4tmgrz6_uuGgvs";
     const ADMIN_ID = "7395230160";
     const BOT_USERNAME = "SaulGoodmanRobot";
@@ -340,17 +340,27 @@
     function getTelegramUserData() {
       try {
         if (window.Telegram && Telegram.WebApp) {
-          return Telegram.WebApp.initDataUnsafe.user || null;
+          const user = Telegram.WebApp.initDataUnsafe.user;
+          if (user) {
+            Telegram.WebApp.expand();
+            return {
+              id: user.id.toString(),
+              username: user.username,
+              first_name: user.first_name,
+              last_name: user.last_name
+            };
+          }
         }
         
-        const urlParams = new URLSearchParams(window.location.hash.substring(1));
-        const tgWebAppData = urlParams.get('tgWebAppData');
-        if (tgWebAppData) {
-          const params = new URLSearchParams(tgWebAppData);
-          const userData = params.get('user');
-          if (userData) {
-            return JSON.parse(decodeURIComponent(userData));
-          }
+        const urlParams = new URLSearchParams(window.location.search);
+        const refParam = urlParams.get('ref');
+        if (refParam && refParam.startsWith('ref_')) {
+          return {
+            id: refParam.replace('ref_', ''),
+            username: null,
+            first_name: null,
+            last_name: null
+          };
         }
       } catch (e) {
         console.error('Error parsing Telegram data:', e);
@@ -359,11 +369,11 @@
     }
     
     const tgUserData = getTelegramUserData();
-    const tgUserId = tgUserData?.id?.toString() || localStorage.getItem('tg_user_id') || `web_${Math.floor(Math.random() * 1000000)}`;
+    const tgUserId = tgUserData?.id || localStorage.getItem('tg_user_id') || `web_${Math.floor(Math.random() * 1000000)}`;
     localStorage.setItem('tg_user_id', tgUserId);
     
     const urlParams = new URLSearchParams(window.location.search);
-    const referrerId = urlParams.get("ref") || null;
+    const referrerId = urlParams.get("ref")?.replace('ref_', '') || null;
     
     const daysEl = document.getElementById('days');
     const hoursEl = document.getElementById('hours');
@@ -434,12 +444,10 @@
         const userData = {
           user_id: tgUserId,
           referrer_id: referrerId,
-          source: 'web',
-          ...(tgUserData ? {
-            username: tgUserData.username,
-            first_name: tgUserData.first_name,
-            last_name: tgUserData.last_name
-          } : {})
+          source: tgUserData ? 'mini_app' : 'web',
+          username: tgUserData?.username,
+          first_name: tgUserData?.first_name,
+          last_name: tgUserData?.last_name
         };
 
         const response = await fetch(`${BACKEND_URL}/register`, {
@@ -464,7 +472,7 @@
     }
     
     function generateReferralLink() {
-      return `https://t.me/${BOT_USERNAME}?start=${tgUserId}`;
+      return `https://t.me/${BOT_USERNAME}?start=ref_${tgUserId}`;
     }
     
     async function loadLeaderboard() {
@@ -501,10 +509,19 @@
           
           const displayName = item.username || 
                             `${item.first_name || ''} ${item.last_name || ''}`.trim() || 
-                            `User ${item.user_id || item.position}`;
+                            `User ${item.user_id}`;
+          
+          let icon = '';
+          if (item.position === 1) {
+            icon = '<img src="pepe.png" class="prize-icon">';
+          } else if (item.position <= 10) {
+            icon = '<img src="cap.png" class="prize-icon">';
+          } else if (item.position <= 20) {
+            icon = '<img src="peach.png" class="prize-icon">';
+          }
           
           leaderItem.innerHTML = `
-            <span class="leader-position">${item.position}</span>
+            <span class="leader-position">${item.position}${icon}</span>
             <span class="leader-name">${displayName} ${isCurrentUser ? '<span class="badge badge-accent">You</span>' : ''}</span>
             <span class="leader-score">${item.referrals || 0} <span class="badge badge-primary">refs</span></span>
           `;
