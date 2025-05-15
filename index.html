@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Better Call Saul Challenge</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
@@ -314,7 +313,7 @@
     
     <div class="card leaderboard">
       <h2 class="card-title">
-        <i class="fas fa-trophy"></i> Leaderboard (Top 50)
+        <i class="fas fa-trophy"></i> Leaderboard
       </h2>
       <div class="leaderboard-header">
         <span>User</span>
@@ -322,7 +321,7 @@
       </div>
       <div class="leaderboard-list" id="leaders">
         <div class="leader-item">
-          <span class="leader-position">1 <img src="/pepe.png" class="prize-icon"></span>
+          <span class="leader-position">1 <img src="pepe.png" class="prize-icon"></span>
           <span class="leader-name">Loading leaderboard...</span>
           <span class="leader-score">0 <span class="badge badge-primary">refs</span></span>
         </div>
@@ -332,7 +331,7 @@
 
   <script>
     const BACKEND_URL = "https://Sonyaaaaaaaaaaaaaaaaaaaaa.pythonanywhere.com";
-    const CHALLENGE_END_DATE = new Date(2026, 5, 30, 23, 59, 59);
+    const CHALLENGE_END_DATE = new Date(2024, 5, 30, 23, 59, 59);
     
     let tgUserId = localStorage.getItem('tg_user_id');
     if (!tgUserId) {
@@ -394,7 +393,10 @@
       try {
         const response = await fetch(`${BACKEND_URL}/register`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
           body: JSON.stringify({ user_id: tgUserId, referrer_id: referrerId })
         });
         
@@ -404,42 +406,49 @@
         return await response.json();
       } catch (err) {
         console.error("Registration error:", err);
-        throw err;
+        return { referrals: 0 };
       }
     }
     
     async function loadReferralLink() {
       try {
-        const response = await fetch(`${BACKEND_URL}/get-referral-link?user_id=${tgUserId}`);
+        const response = await fetch(`${BACKEND_URL}/get-referral-link?user_id=${tgUserId}`, {
+          headers: { "Accept": "application/json" }
+        });
+        
         if (!response.ok) {
           throw new Error('Failed to get referral link');
         }
+        
         const data = await response.json();
-        refLinkEl.value = data.link;
+        refLinkEl.value = data.link || "Error generating link";
         return data;
       } catch (err) {
         console.error("Referral link error:", err);
-        refLinkEl.value = "Error loading link";
-        throw err;
+        refLinkEl.value = window.location.href.split('?')[0] + `?start=${tgUserId}`;
+        return { link: refLinkEl.value };
       }
     }
     
     async function loadLeaderboard() {
       try {
-        const response = await fetch(`${BACKEND_URL}/leaderboard`);
+        const response = await fetch(`${BACKEND_URL}/leaderboard`, {
+          headers: { "Accept": "application/json" }
+        });
+        
         if (!response.ok) {
           throw new Error('Failed to load leaderboard');
         }
-        const { data } = await response.json();
         
+        const data = await response.json();
         leadersEl.innerHTML = '';
         
-        if (!data || data.length === 0) {
-          leadersEl.innerHTML = '<div class="leader-item">No referrals yet</div>';
+        if (!data || !Array.isArray(data)) {
+          leadersEl.innerHTML = '<div class="leader-item">No data available</div>';
           return;
         }
         
-        data.forEach((item) => {
+        data.forEach((item, index) => {
           const leaderItem = document.createElement('div');
           leaderItem.className = 'leader-item';
           
@@ -451,21 +460,22 @@
           
           const displayName = item.username || 
                             `${item.first_name || ''} ${item.last_name || ''}`.trim() || 
-                            item.user_id;
+                            `User ${item.user_id || index + 1}`;
           
           let icon = '';
-          if (item.position === 1) {
-            icon = '<img src="/pepe.png" class="prize-icon">';
-          } else if (item.position <= 10) {
-            icon = '<img src="/cap.png" class="prize-icon">';
-          } else if (item.position <= 20) {
-            icon = '<img src="/peach.png" class="prize-icon">';
+          const position = index + 1;
+          if (position === 1) {
+            icon = '<img src="pepe.png" class="prize-icon">';
+          } else if (position <= 10) {
+            icon = '<img src="cap.png" class="prize-icon">';
+          } else if (position <= 20) {
+            icon = '<img src="peach.png" class="prize-icon">';
           }
           
           leaderItem.innerHTML = `
-            <span class="leader-position">${item.position}${icon}</span>
+            <span class="leader-position">${position}${icon}</span>
             <span class="leader-name">${displayName} ${isCurrentUser ? '<span class="badge badge-accent">You</span>' : ''}</span>
-            <span class="leader-score">${item.referrals} <span class="badge badge-primary">refs</span></span>
+            <span class="leader-score">${item.referrals || 0} <span class="badge badge-primary">refs</span></span>
           `;
           
           leadersEl.appendChild(leaderItem);
@@ -473,7 +483,6 @@
       } catch (err) {
         console.error("Leaderboard error:", err);
         leadersEl.innerHTML = '<div class="leader-item">Error loading leaderboard</div>';
-        throw err;
       }
     }
     
@@ -498,17 +507,13 @@
         setInterval(updateCountdown, 1000);
         updateCountdown();
         
-        await register();
-        await loadReferralLink();
-        await loadLeaderboard();
+        await Promise.all([
+          register(),
+          loadReferralLink(),
+          loadLeaderboard()
+        ]);
         
-        setInterval(async () => {
-          try {
-            await loadLeaderboard();
-          } catch (err) {
-            console.error("Refresh error:", err);
-          }
-        }, 30000);
+        setInterval(loadLeaderboard, 30000);
       } catch (err) {
         console.error("Initialization error:", err);
       }
