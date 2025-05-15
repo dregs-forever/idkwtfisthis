@@ -169,10 +169,12 @@
       display: flex;
       justify-content: space-between;
       margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--accent);
     }
     
     .leaderboard-list {
-      max-height: 300px;
+      max-height: 400px;
       overflow-y: auto;
       scrollbar-width: thin;
       scrollbar-color: var(--primary) var(--dark);
@@ -201,7 +203,10 @@
     .leader-position {
       font-weight: 700;
       color: var(--accent);
-      min-width: 30px;
+      min-width: 40px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     
     .leader-name {
@@ -236,6 +241,13 @@
       color: var(--dark);
     }
     
+    .prize-icon {
+      width: 20px;
+      height: 20px;
+      vertical-align: middle;
+      margin-left: 5px;
+    }
+    
     @media (max-width: 480px) {
       .logo {
         font-size: 2rem;
@@ -249,9 +261,12 @@
       .card {
         padding: 1rem;
       }
+      
+      .leaderboard-list {
+        max-height: 300px;
+      }
     }
     
-    /* Animation */
     @keyframes pulse {
       0% { transform: scale(1); }
       50% { transform: scale(1.05); }
@@ -299,38 +314,35 @@
     
     <div class="card leaderboard">
       <h2 class="card-title">
-        <i class="fas fa-trophy"></i> Leaderboard
+        <i class="fas fa-trophy"></i> Leaderboard (Top 50)
       </h2>
       <div class="leaderboard-header">
         <span>User</span>
         <span>Referrals</span>
       </div>
       <div class="leaderboard-list" id="leaders">
-        <!-- Leaderboard items will be inserted here -->
+        <div class="leader-item">
+          <span class="leader-position">1 <img src="/static/pepe.png" class="prize-icon"></span>
+          <span class="leader-name">Loading leaderboard...</span>
+          <span class="leader-score">0 <span class="badge badge-primary">refs</span></span>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
     const BACKEND_URL = "https://Sonyaaaaaaaaaaaaaaaaaaaaa.pythonanywhere.com";
-    
-    // Challenge end date (YYYY, MM-1, DD, HH, MM, SS)
     const CHALLENGE_END_DATE = new Date(2026, 5, 30, 23, 59, 59);
     
-    // Используем localStorage для сохранения user_id
     let tgUserId = localStorage.getItem('tg_user_id');
-    
-    // Если user_id нет в localStorage, генерируем новый и сохраняем
     if (!tgUserId) {
       tgUserId = `tg_${Math.floor(Math.random() * 100000)}`;
       localStorage.setItem('tg_user_id', tgUserId);
     }
     
-    // Получаем referrer_id из URL
     const urlParams = new URLSearchParams(window.location.search);
     const referrerId = urlParams.get("start") || null;
     
-    // DOM элементы
     const daysEl = document.getElementById('days');
     const hoursEl = document.getElementById('hours');
     const minutesEl = document.getElementById('minutes');
@@ -340,7 +352,6 @@
     const copyBtn = document.getElementById('copyBtn');
     const leadersEl = document.getElementById('leaders');
     
-    // Format end date for display
     endDateEl.textContent = CHALLENGE_END_DATE.toLocaleString('en-US', {
       month: 'long',
       day: 'numeric',
@@ -353,7 +364,6 @@
       const now = new Date();
       const diff = CHALLENGE_END_DATE - now;
       
-      // If challenge has ended
       if (diff <= 0) {
         document.querySelector('.timer').innerHTML = '<span style="color: var(--accent)">Challenge Ended!</span>';
         return;
@@ -369,7 +379,6 @@
       minutesEl.textContent = formatTime(minutes);
       secondsEl.textContent = formatTime(seconds);
       
-      // Add pulse animation when time is running low (last 3 days)
       if (days <= 3) {
         document.querySelector('.timer').classList.add('pulse');
       } else {
@@ -377,8 +386,9 @@
       }
     }
     
-    // Format time to always show 2 digits
-    const formatTime = (time) => time < 10 ? `0${time}` : time;
+    function formatTime(time) {
+      return time < 10 ? `0${time}` : time;
+    }
     
     async function register() {
       try {
@@ -391,8 +401,10 @@
         if (!response.ok) {
           throw new Error('Registration failed');
         }
+        return await response.json();
       } catch (err) {
         console.error("Registration error:", err);
+        throw err;
       }
     }
     
@@ -400,13 +412,15 @@
       try {
         const response = await fetch(`${BACKEND_URL}/get-referral-link?user_id=${tgUserId}`);
         if (!response.ok) {
-          throw new Error('Failed to fetch referral link');
+          throw new Error('Failed to get referral link');
         }
         const data = await response.json();
         refLinkEl.value = data.link;
+        return data;
       } catch (err) {
         console.error("Referral link error:", err);
-        refLinkEl.value = "Error loading link. Please refresh.";
+        refLinkEl.value = "Error loading link";
+        throw err;
       }
     }
     
@@ -414,31 +428,43 @@
       try {
         const response = await fetch(`${BACKEND_URL}/leaderboard`);
         if (!response.ok) {
-          throw new Error('Failed to fetch leaderboard');
+          throw new Error('Failed to load leaderboard');
         }
-        const list = await response.json();
+        const { data } = await response.json();
         
         leadersEl.innerHTML = '';
         
-        if (list.length === 0) {
-          leadersEl.innerHTML = '<div class="leader-item">No referrals yet. Be the first!</div>';
+        if (!data || data.length === 0) {
+          leadersEl.innerHTML = '<div class="leader-item">No referrals yet</div>';
           return;
         }
         
-        list.forEach((item, i) => {
+        data.forEach((item) => {
           const leaderItem = document.createElement('div');
           leaderItem.className = 'leader-item';
           
-          // Highlight current user
           const isCurrentUser = item.user_id === tgUserId;
           if (isCurrentUser) {
             leaderItem.style.backgroundColor = 'rgba(255, 193, 7, 0.1)';
             leaderItem.style.borderLeft = '3px solid var(--accent)';
           }
           
+          const displayName = item.username || 
+                            `${item.first_name || ''} ${item.last_name || ''}`.trim() || 
+                            item.user_id;
+          
+          let icon = '';
+          if (item.position === 1) {
+            icon = '<img src="/pepe.png" class="prize-icon">';
+          } else if (item.position <= 10) {
+            icon = '<img src="/cap.png" class="prize-icon">';
+          } else if (item.position <= 20) {
+            icon = '<img src="/peach.png" class="prize-icon">';
+          }
+          
           leaderItem.innerHTML = `
-            <span class="leader-position">${i + 1}</span>
-            <span class="leader-name">${item.user_id} ${isCurrentUser ? '<span class="badge badge-accent">You</span>' : ''}</span>
+            <span class="leader-position">${item.position}${icon}</span>
+            <span class="leader-name">${displayName} ${isCurrentUser ? '<span class="badge badge-accent">You</span>' : ''}</span>
             <span class="leader-score">${item.referrals} <span class="badge badge-primary">refs</span></span>
           `;
           
@@ -447,6 +473,7 @@
       } catch (err) {
         console.error("Leaderboard error:", err);
         leadersEl.innerHTML = '<div class="leader-item">Error loading leaderboard</div>';
+        throw err;
       }
     }
     
@@ -455,7 +482,6 @@
       refLinkEl.setSelectionRange(0, 99999);
       document.execCommand('copy');
       
-      // Change button temporarily to show success
       copyBtn.innerHTML = '<i class="fas fa-check"></i>';
       copyBtn.style.backgroundColor = '#4CAF50';
       
@@ -465,21 +491,30 @@
       }, 2000);
     }
     
-    // Event listeners
     copyBtn.addEventListener('click', copyLink);
     
-    // Initialize
-    setInterval(updateCountdown, 1000);
-    updateCountdown();
+    async function initializeApp() {
+      try {
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+        
+        await register();
+        await loadReferralLink();
+        await loadLeaderboard();
+        
+        setInterval(async () => {
+          try {
+            await loadLeaderboard();
+          } catch (err) {
+            console.error("Refresh error:", err);
+          }
+        }, 30000);
+      } catch (err) {
+        console.error("Initialization error:", err);
+      }
+    }
     
-    register();
-    loadReferralLink();
-    loadLeaderboard();
-    
-    // Load data every 30 seconds to keep leaderboard updated
-    setInterval(() => {
-      loadLeaderboard();
-    }, 30000);
+    document.addEventListener('DOMContentLoaded', initializeApp);
   </script>
 </body>
 </html>
