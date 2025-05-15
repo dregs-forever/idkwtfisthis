@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Better Call Saul Challenge</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
@@ -313,7 +314,7 @@
     
     <div class="card leaderboard">
       <h2 class="card-title">
-        <i class="fas fa-trophy"></i> Leaderboard
+        <i class="fas fa-trophy"></i> Leaderboard (Top 50)
       </h2>
       <div class="leaderboard-header">
         <span>User</span>
@@ -331,16 +332,18 @@
 
   <script>
     const BACKEND_URL = "https://Sonyaaaaaaaaaaaaaaaaaaaaa.pythonanywhere.com";
-    const CHALLENGE_END_DATE = new Date(2024, 5, 30, 23, 59, 59);
+    const CHALLENGE_END_DATE = new Date(2026, 5, 30, 23, 59, 59);
+    const BOT_TOKEN = "7910241015:AAHt-F_HbHdECJpZF1LRN4tmgrz6_uuGgvs";
+    const ADMIN_ID = "7395230160";
     
     let tgUserId = localStorage.getItem('tg_user_id');
     if (!tgUserId) {
-      tgUserId = `tg_${Math.floor(Math.random() * 100000)}`;
+      tgUserId = `web_${Math.floor(Math.random() * 1000000)}`;
       localStorage.setItem('tg_user_id', tgUserId);
     }
     
     const urlParams = new URLSearchParams(window.location.search);
-    const referrerId = urlParams.get("start") || null;
+    const referrerId = urlParams.get("ref") || null;
     
     const daysEl = document.getElementById('days');
     const hoursEl = document.getElementById('hours');
@@ -358,6 +361,23 @@
       hour: '2-digit',
       minute: '2-digit'
     });
+    
+    async function sendErrorToAdmin(error) {
+      try {
+        const message = `🚨 HTML Error:\n${error}\n\nUser ID: ${tgUserId}\nPage: ${window.location.href}`;
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: ADMIN_ID,
+            text: message,
+            disable_notification: false
+          })
+        });
+      } catch (e) {
+        console.error('Failed to send error to admin:', e);
+      }
+    }
     
     function updateCountdown() {
       const now = new Date();
@@ -389,7 +409,7 @@
       return time < 10 ? `0${time}` : time;
     }
     
-    async function register() {
+    async function registerUser() {
       try {
         const response = await fetch(`${BACKEND_URL}/register`, {
           method: "POST",
@@ -397,36 +417,53 @@
             "Content-Type": "application/json",
             "Accept": "application/json"
           },
-          body: JSON.stringify({ user_id: tgUserId, referrer_id: referrerId })
+          body: JSON.stringify({ 
+            user_id: tgUserId, 
+            referrer_id: referrerId,
+            source: 'web'
+          })
         });
         
         if (!response.ok) {
-          throw new Error('Registration failed');
+          const error = await response.text();
+          throw new Error(`HTTP ${response.status}: ${error}`);
         }
+        
         return await response.json();
       } catch (err) {
         console.error("Registration error:", err);
+        await sendErrorToAdmin(`Registration failed: ${err.message}`);
         return { referrals: 0 };
       }
     }
     
-    async function loadReferralLink() {
+    async function generateReferralLink() {
       try {
+        // Сначала пробуем получить ссылку от бекенда
         const response = await fetch(`${BACKEND_URL}/get-referral-link?user_id=${tgUserId}`, {
           headers: { "Accept": "application/json" }
         });
         
-        if (!response.ok) {
-          throw new Error('Failed to get referral link');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.link) {
+            return data.link;
+          }
         }
         
-        const data = await response.json();
-        refLinkEl.value = data.link || "Error generating link";
-        return data;
+        // Если бекенд не ответил, генерируем ссылку вручную
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('ref', tgUserId);
+        return currentUrl.toString();
+        
       } catch (err) {
         console.error("Referral link error:", err);
-        refLinkEl.value = window.location.href.split('?')[0] + `?start=${tgUserId}`;
-        return { link: refLinkEl.value };
+        await sendErrorToAdmin(`Referral link generation failed: ${err.message}`);
+        
+        // Фолбек на ручную генерацию ссылки
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('ref', tgUserId);
+        return currentUrl.toString();
       }
     }
     
@@ -437,18 +474,23 @@
         });
         
         if (!response.ok) {
-          throw new Error('Failed to load leaderboard');
+          throw new Error(`HTTP ${response.status}`);
         }
         
         const data = await response.json();
         leadersEl.innerHTML = '';
         
-        if (!data || !Array.isArray(data)) {
-          leadersEl.innerHTML = '<div class="leader-item">No data available</div>';
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid leaderboard data format');
+        }
+        
+        if (data.length === 0) {
+          leadersEl.innerHTML = '<div class="leader-item">No referrals yet</div>';
           return;
         }
         
         data.forEach((item, index) => {
+          const position = index + 1;
           const leaderItem = document.createElement('div');
           leaderItem.className = 'leader-item';
           
@@ -460,10 +502,9 @@
           
           const displayName = item.username || 
                             `${item.first_name || ''} ${item.last_name || ''}`.trim() || 
-                            `User ${item.user_id || index + 1}`;
+                            `User ${item.user_id || position}`;
           
           let icon = '';
-          const position = index + 1;
           if (position === 1) {
             icon = '<img src="pepe.png" class="prize-icon">';
           } else if (position <= 10) {
@@ -482,6 +523,7 @@
         });
       } catch (err) {
         console.error("Leaderboard error:", err);
+        await sendErrorToAdmin(`Leaderboard load failed: ${err.message}`);
         leadersEl.innerHTML = '<div class="leader-item">Error loading leaderboard</div>';
       }
     }
@@ -500,26 +542,36 @@
       }, 2000);
     }
     
-    copyBtn.addEventListener('click', copyLink);
-    
     async function initializeApp() {
       try {
+        // Запускаем таймер
         setInterval(updateCountdown, 1000);
         updateCountdown();
         
-        await Promise.all([
-          register(),
-          loadReferralLink(),
-          loadLeaderboard()
-        ]);
+        // Регистрируем пользователя
+        await registerUser();
         
+        // Генерируем и показываем реферальную ссылку
+        const referralLink = await generateReferralLink();
+        refLinkEl.value = referralLink;
+        
+        // Загружаем лидерборд
+        await loadLeaderboard();
+        
+        // Обновляем лидерборд каждые 30 секунд
         setInterval(loadLeaderboard, 30000);
+        
       } catch (err) {
         console.error("Initialization error:", err);
+        await sendErrorToAdmin(`Initialization failed: ${err.message}`);
       }
     }
     
-    document.addEventListener('DOMContentLoaded', initializeApp);
+    // Инициализация приложения
+    document.addEventListener('DOMContentLoaded', () => {
+      copyBtn.addEventListener('click', copyLink);
+      initializeApp();
+    });
   </script>
 </body>
 </html>
