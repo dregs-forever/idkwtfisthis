@@ -335,12 +335,37 @@
     const CHALLENGE_END_DATE = new Date(2026, 5, 30, 23, 59, 59);
     const BOT_TOKEN = "7910241015:AAHt-F_HbHdECJpZF1LRN4tmgrz6_uuGgvs";
     const ADMIN_ID = "7395230160";
+    const BOT_USERNAME = "SaulGoodmanRobot";
     
-    let tgUserId = localStorage.getItem('tg_user_id');
-    if (!tgUserId) {
-      tgUserId = `web_${Math.floor(Math.random() * 1000000)}`;
-      localStorage.setItem('tg_user_id', tgUserId);
+    function getTelegramUserId() {
+      try {
+        if (window.Telegram && Telegram.WebApp) {
+          const user = Telegram.WebApp.initDataUnsafe.user;
+          if (user && user.id) {
+            return user.id.toString();
+          }
+        }
+        
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const tgWebAppData = urlParams.get('tgWebAppData');
+        if (tgWebAppData) {
+          const params = new URLSearchParams(tgWebAppData);
+          const userData = params.get('user');
+          if (userData) {
+            const user = JSON.parse(decodeURIComponent(userData));
+            if (user && user.id) {
+              return user.id.toString();
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing Telegram data:', e);
+      }
+      return null;
     }
+    
+    const tgUserId = getTelegramUserId() || localStorage.getItem('tg_user_id') || `web_${Math.floor(Math.random() * 1000000)}`;
+    localStorage.setItem('tg_user_id', tgUserId);
     
     const urlParams = new URLSearchParams(window.location.search);
     const referrerId = urlParams.get("ref") || null;
@@ -437,34 +462,8 @@
       }
     }
     
-    async function generateReferralLink() {
-      try {
-        // Сначала пробуем получить ссылку от бекенда
-        const response = await fetch(`${BACKEND_URL}/get-referral-link?user_id=${tgUserId}`, {
-          headers: { "Accept": "application/json" }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.link) {
-            return data.link;
-          }
-        }
-        
-        // Если бекенд не ответил, генерируем ссылку вручную
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('ref', tgUserId);
-        return currentUrl.toString();
-        
-      } catch (err) {
-        console.error("Referral link error:", err);
-        await sendErrorToAdmin(`Referral link generation failed: ${err.message}`);
-        
-        // Фолбек на ручную генерацию ссылки
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('ref', tgUserId);
-        return currentUrl.toString();
-      }
+    function generateReferralLink() {
+      return `https://t.me/${BOT_USERNAME}?start=${tgUserId}`;
     }
     
     async function loadLeaderboard() {
@@ -544,21 +543,16 @@
     
     async function initializeApp() {
       try {
-        // Запускаем таймер
         setInterval(updateCountdown, 1000);
         updateCountdown();
         
-        // Регистрируем пользователя
         await registerUser();
         
-        // Генерируем и показываем реферальную ссылку
-        const referralLink = await generateReferralLink();
+        const referralLink = generateReferralLink();
         refLinkEl.value = referralLink;
         
-        // Загружаем лидерборд
         await loadLeaderboard();
         
-        // Обновляем лидерборд каждые 30 секунд
         setInterval(loadLeaderboard, 30000);
         
       } catch (err) {
@@ -567,7 +561,6 @@
       }
     }
     
-    // Инициализация приложения
     document.addEventListener('DOMContentLoaded', () => {
       copyBtn.addEventListener('click', copyLink);
       initializeApp();
