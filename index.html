@@ -332,13 +332,48 @@
 
   <script>
     const BACKEND_URL = "https://Sonyaaaaaaaaaaaaaaaaaaaaa.pythonanywhere.com";
-    const CHALLENGE_END_DATE = new Date(2026, 11, 31, 23, 59, 59); // 31 декабря 2026 года
-    const BOT_TOKEN = "7910241015:AAHt-F_HbHdECJpZF1LRN4tmgrz6_uuGgvs";
-    const ADMIN_ID = "7395230160";
+    const CHALLENGE_END_DATE = new Date(2026, 11, 31, 23, 59, 59);
     const BOT_USERNAME = "SaulGoodmanRobot";
     
-    function getTelegramUserData() {
+    // Улучшенная функция для логирования ошибок с расшифровкой URL
+    function logError(error, context) {
       try {
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const decodedParams = {};
+        
+        for (const [key, value] of urlParams.entries()) {
+          try {
+            decodedParams[key] = decodeURIComponent(value);
+          } catch {
+            decodedParams[key] = value;
+          }
+        }
+        
+        console.error('🚨 Error:', error.message, '\nContext:', context, '\nURL Params:', decodedParams);
+        
+        // Отправка ошибки в Telegram (если доступен Telegram WebApp)
+        if (window.Telegram && Telegram.WebApp) {
+          const errorMessage = `🚨 HTML Error in ${context}:
+${error.message}
+
+User ID: ${Telegram.WebApp.initDataUnsafe.user?.id || 'unknown'}
+URL: ${window.location.href}
+Decoded Params: ${JSON.stringify(decodedParams, null, 2)}`;
+
+          Telegram.WebApp.sendData(JSON.stringify({
+            type: 'error_report',
+            error: errorMessage
+          }));
+        }
+      } catch (logError) {
+        console.error('Failed to log error:', logError);
+      }
+    }
+
+    // Функция для получения данных пользователя
+    function getUserData() {
+      try {
+        // Пытаемся получить данные из Telegram WebApp
         if (window.Telegram && Telegram.WebApp) {
           Telegram.WebApp.expand();
           const user = Telegram.WebApp.initDataUnsafe.user;
@@ -346,12 +381,14 @@
             return {
               id: user.id.toString(),
               username: user.username,
-              first_name: user.first_name,
-              last_name: user.last_name
+              firstName: user.first_name,
+              lastName: user.last_name,
+              source: 'telegram'
             };
           }
         }
         
+        // Пытаемся получить данные из URL параметров
         const urlParams = new URLSearchParams(window.location.hash.substring(1));
         const tgWebAppData = urlParams.get('tgWebAppData');
         if (tgWebAppData) {
@@ -362,32 +399,41 @@
             return {
               id: user.id.toString(),
               username: user.username,
-              first_name: user.first_name,
-              last_name: user.last_name
+              firstName: user.first_name,
+              lastName: user.last_name,
+              source: 'webapp'
             };
           }
         }
         
+        // Пытаемся получить реферальный ID
         const urlSearchParams = new URLSearchParams(window.location.search);
         const refParam = urlSearchParams.get('ref');
         if (refParam && refParam.startsWith('ref_')) {
           return {
             id: refParam.replace('ref_', ''),
-            username: null,
-            first_name: null,
-            last_name: null
+            source: 'referral'
           };
         }
-      } catch (e) {
-        console.error('Error parsing Telegram data:', e);
+        
+        // Возвращаем анонимного пользователя
+        return {
+          id: `anon_${Math.random().toString(36).substring(2, 9)}`,
+          source: 'anonymous'
+        };
+      } catch (error) {
+        logError(error, 'getUserData');
+        return {
+          id: 'error_user',
+          source: 'error'
+        };
       }
-      return null;
     }
 
-    const tgUserData = getTelegramUserData();
-    const tgUserId = tgUserData?.id || localStorage.getItem('tg_user_id') || `web_${Math.floor(Math.random() * 1000000)}`;
-    localStorage.setItem('tg_user_id', tgUserId);
-
+    const userData = getUserData();
+    const userId = userData.id;
+    
+    // Элементы DOM
     const daysEl = document.getElementById('days');
     const hoursEl = document.getElementById('hours');
     const minutesEl = document.getElementById('minutes');
@@ -397,6 +443,7 @@
     const copyBtn = document.getElementById('copyBtn');
     const leadersEl = document.getElementById('leaders');
 
+    // Установка даты окончания
     endDateEl.textContent = CHALLENGE_END_DATE.toLocaleString('en-US', {
       month: 'long',
       day: 'numeric',
@@ -405,23 +452,7 @@
       minute: '2-digit'
     });
 
-    async function sendErrorToAdmin(error) {
-      try {
-        const message = `🚨 HTML Error:\n${error}\n\nUser ID: ${tgUserId}\nPage: ${window.location.href}`;
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: ADMIN_ID,
-            text: message,
-            disable_notification: false
-          })
-        });
-      } catch (e) {
-        console.error('Failed to send error to admin:', e);
-      }
-    }
-
+    // Таймер обратного отсчета
     function updateCountdown() {
       const now = new Date();
       const diff = CHALLENGE_END_DATE - now;
@@ -436,10 +467,10 @@
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
       
-      daysEl.textContent = formatTime(days);
-      hoursEl.textContent = formatTime(hours);
-      minutesEl.textContent = formatTime(minutes);
-      secondsEl.textContent = formatTime(seconds);
+      daysEl.textContent = days.toString().padStart(2, '0');
+      hoursEl.textContent = hours.toString().padStart(2, '0');
+      minutesEl.textContent = minutes.toString().padStart(2, '0');
+      secondsEl.textContent = seconds.toString().padStart(2, '0');
       
       if (days <= 3) {
         document.querySelector('.timer').classList.add('pulse');
@@ -448,112 +479,99 @@
       }
     }
 
-    function formatTime(time) {
-      return time < 10 ? `0${time}` : time;
-    }
-
+    // Регистрация пользователя
     async function registerUser() {
       try {
-        const userData = {
-          user_id: tgUserId,
-          referrer_id: null,
-          source: tgUserData ? 'mini_app' : 'web',
-          username: tgUserData?.username,
-          first_name: tgUserData?.first_name,
-          last_name: tgUserData?.last_name
-        };
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const refParam = urlParams.get('ref');
-        if (refParam && refParam.startsWith('ref_')) {
-          userData.referrer_id = refParam.replace('ref_', '');
-        }
-
         const response = await fetch(`${BACKEND_URL}/register`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
             "Accept": "application/json"
           },
-          body: JSON.stringify(userData)
+          body: JSON.stringify({
+            user_id: userId,
+            username: userData.username,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            source: userData.source
+          })
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         return await response.json();
-      } catch (err) {
-        console.error("Registration error:", err);
-        await sendErrorToAdmin(`Registration failed: ${err.message}`);
-        return { referrals: 0 };
+      } catch (error) {
+        logError(error, 'registerUser');
+        return null;
       }
     }
 
+    // Генерация реферальной ссылки
     function generateReferralLink() {
-      return `https://t.me/${BOT_USERNAME}?start=ref_${tgUserId}`;
+      return `https://t.me/${BOT_USERNAME}?start=ref_${userId}`;
     }
 
+    // Загрузка лидерборда
     async function loadLeaderboard() {
       try {
-        const response = await fetch(`${BACKEND_URL}/leaderboard`, {
-          headers: { "Accept": "application/json" }
-        });
+        const response = await fetch(`${BACKEND_URL}/leaderboard`);
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
-        leadersEl.innerHTML = '';
         
         if (!data || !Array.isArray(data.data)) {
           throw new Error('Invalid leaderboard data format');
         }
+        
+        leadersEl.innerHTML = '';
         
         if (data.data.length === 0) {
           leadersEl.innerHTML = '<div class="leader-item">No referrals yet</div>';
           return;
         }
         
-        data.data.forEach((item) => {
+        data.data.forEach((user, index) => {
           const leaderItem = document.createElement('div');
           leaderItem.className = 'leader-item';
           
-          const isCurrentUser = item.user_id === tgUserId;
-          if (isCurrentUser) {
+          if (user.user_id === userId) {
             leaderItem.style.backgroundColor = 'rgba(255, 193, 7, 0.1)';
             leaderItem.style.borderLeft = '3px solid var(--accent)';
           }
           
-          const displayName = item.username || 
-                            `${item.first_name || ''} ${item.last_name || ''}`.trim() || 
-                            `User ${item.user_id}`;
+          const displayName = user.username || 
+                            `${user.first_name || ''} ${user.last_name || ''}`.trim() || 
+                            `User ${user.user_id}`;
           
           let icon = '';
-          if (item.position === 1) {
+          if (user.position === 1) {
             icon = '<img src="pepe.png" class="prize-icon" alt="1st place">';
-          } else if (item.position <= 10) {
+          } else if (user.position <= 10) {
             icon = '<img src="cap.png" class="prize-icon" alt="Top 10">';
-          } else if (item.position <= 20) {
+          } else if (user.position <= 20) {
             icon = '<img src="peach.png" class="prize-icon" alt="Top 20">';
           }
           
           leaderItem.innerHTML = `
-            <span class="leader-position">${item.position}${icon}</span>
-            <span class="leader-name">${displayName} ${isCurrentUser ? '<span class="badge badge-accent">You</span>' : ''}</span>
-            <span class="leader-score">${item.referrals || 0} <span class="badge badge-primary">refs</span></span>
+            <span class="leader-position">${user.position}${icon}</span>
+            <span class="leader-name">${displayName} ${user.user_id === userId ? '<span class="badge badge-accent">You</span>' : ''}</span>
+            <span class="leader-score">${user.referrals || 0} <span class="badge badge-primary">refs</span></span>
           `;
           
           leadersEl.appendChild(leaderItem);
         });
-      } catch (err) {
-        console.error("Leaderboard error:", err);
-        await sendErrorToAdmin(`Leaderboard load failed: ${err.message}`);
+      } catch (error) {
+        logError(error, 'loadLeaderboard');
         leadersEl.innerHTML = '<div class="leader-item">Error loading leaderboard</div>';
       }
     }
 
+    // Копирование ссылки
     function copyLink() {
       refLinkEl.select();
       refLinkEl.setSelectionRange(0, 99999);
@@ -568,25 +586,30 @@
       }, 2000);
     }
 
+    // Инициализация приложения
     async function initializeApp() {
       try {
+        // Запускаем таймер
         setInterval(updateCountdown, 1000);
         updateCountdown();
         
+        // Регистрируем пользователя
         await registerUser();
         
-        const referralLink = generateReferralLink();
-        refLinkEl.value = referralLink;
+        // Устанавливаем реферальную ссылку
+        refLinkEl.value = generateReferralLink();
         
+        // Загружаем лидерборд
         await loadLeaderboard();
         
+        // Обновляем лидерборд каждые 30 секунд
         setInterval(loadLeaderboard, 30000);
-      } catch (err) {
-        console.error("Initialization error:", err);
-        await sendErrorToAdmin(`Initialization failed: ${err.message}`);
+      } catch (error) {
+        logError(error, 'initializeApp');
       }
     }
 
+    // Инициализация при загрузке страницы
     document.addEventListener('DOMContentLoaded', () => {
       copyBtn.addEventListener('click', copyLink);
       initializeApp();
